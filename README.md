@@ -56,7 +56,7 @@ Optional:
 - `ELEVENLABS_AARUSH_PHONE_NUMBER_ID`
 - `ELEVENLABS_ENABLED=false` (set to `true` only after configuring the call provider)
 - `ELEVENLABS_WEBHOOK_SECRET` (recommended for signed ElevenLabs post-call webhooks)
-- `ELEVENLABS_CALL_TOOL_SECRET` (required for the ElevenLabs live memory-retrieval tool)
+- `ELEVENLABS_CALL_TOOL_SECRET` (optional separate password for the ElevenLabs live memory-retrieval tool; if omitted, the webhook secret is accepted)
 - `TWILIO_AUTH_TOKEN` (only needed for direct Twilio callback signature verification)
 
 ## Connect ElevenLabs and Twilio calls

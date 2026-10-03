@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     (objectBody.action === "retrieve_memory" ||
       (typeof objectBody.query === "string" && objectBody.type === undefined)));
   if (isMemoryRequest) {
-    const secret = process.env.ELEVENLABS_CALL_TOOL_SECRET;
+    const secret = process.env.ELEVENLABS_CALL_TOOL_SECRET ?? process.env.ELEVENLABS_WEBHOOK_SECRET;
     const suppliedSecret = request.headers.get("x-aarush-call-secret");
     if (!secret || suppliedSecret !== secret) return NextResponse.json({ error: "Call memory tool is not configured" }, { status: 503 });
     const query = typeof objectBody?.query === "string" ? objectBody.query.trim() : "";
