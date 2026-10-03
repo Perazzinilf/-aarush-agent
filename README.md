@@ -12,7 +12,8 @@ A cloud-native personal agent with a consistent Aarush personality, an OpenAI Co
 - Chat page with retrieved-memory inspection and explicit end/extract control.
 - Memory dashboard for search, editing, pinning, archiving, and deletion.
 - `/api/agent`, `/api/memories`, `/api/transcripts`, and `/api/calls` routes.
-- ElevenLabs variables and call boundary prepared, but calling is disabled.
+- `/api/calls` accepts ElevenLabs post-call transcripts and Twilio transcription callbacks, stores them in the same user-scoped transcript tables, extracts long-term memories, and deduplicates provider retries.
+- ElevenLabs outbound calling is available behind `ELEVENLABS_ENABLED=true`; it remains disabled until the provider configuration is complete.
 
 The schema supports multiple users. The first milestone uses a stable dev identity and does not include public signup.
 
@@ -53,7 +54,26 @@ Optional:
 - `ELEVENLABS_API_KEY`
 - `ELEVENLABS_AARUSH_AGENT_ID`
 - `ELEVENLABS_AARUSH_PHONE_NUMBER_ID`
-- `ELEVENLABS_ENABLED=false` (must remain false for this milestone)
+- `ELEVENLABS_ENABLED=false` (set to `true` only after configuring the call provider)
+- `ELEVENLABS_WEBHOOK_SECRET` (recommended for signed ElevenLabs post-call webhooks)
+- `ELEVENLABS_CALL_TOOL_SECRET` (required for the ElevenLabs live memory-retrieval tool)
+- `TWILIO_AUTH_TOKEN` (only needed for direct Twilio callback signature verification)
+
+## Connect ElevenLabs and Twilio calls
+
+The web chat and voice path use the same `AARUSH_DEV_USER_ID`. Configure the ElevenLabs agent with Aarush's personality, attach the Twilio phone number through ElevenLabs, and set its post-call transcription webhook to:
+
+```text
+https://aarush-agent.vercel.app/api/calls
+```
+
+The webhook must deliver the post-call transcript. The route creates a durable conversation record, saves the user/agent messages, extracts useful memories, and writes them to the same `memories` table used by web chat. Repeated provider webhooks are ignored after the conversation is finalized.
+
+To let Aarush use those memories during a later phone call, add an ElevenLabs server tool pointing to the same URL. Have the tool send `{ "action": "retrieve_memory", "query": "..." }` with the `x-aarush-call-secret` header set to `ELEVENLABS_CALL_TOOL_SECRET`. Give the tool a short description such as “Retrieve relevant private continuity notes before answering the caller.” The returned `context` should be available to the voice agent before it replies. This keeps retrieval server-side and uses the same `memories` table as web chat.
+
+For outbound calls from the app, POST JSON to `/api/calls` with `{ "action": "start", "toNumber": "+..." }` after setting `ELEVENLABS_ENABLED=true`. This uses ElevenLabs' Twilio outbound-call API and the configured agent/phone-number IDs.
+
+Twilio should remain the telephony transport attached to the ElevenLabs agent. A direct Twilio webhook carrying `CallSid` and `TranscriptionText` is also accepted, but it does not replace the ElevenLabs voice agent.
 
 ## Deploy to Vercel
 

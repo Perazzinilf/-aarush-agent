@@ -3,6 +3,7 @@ import type { AgentSessionRecord, ConversationRecord, TranscriptMessage } from "
 
 export interface TranscriptStore {
   createConversation(userId: string, openaiConversationId: string): Promise<ConversationRecord>;
+  findConversationByOpenAIId(userId: string, openaiConversationId: string): Promise<ConversationRecord | null>;
   appendMessage(conversationId: string, userId: string, message: TranscriptMessage): Promise<void>;
   getConversation(userId: string, conversationId: string): Promise<ConversationRecord>;
   finishConversation(userId: string, conversationId: string, extractedMemoryIds: string[]): Promise<void>;
@@ -31,6 +32,19 @@ export class SupabaseTranscriptStore implements TranscriptStore {
     const { data, error } = await this.db.from("conversations").insert({ user_id: userId, openai_conversation_id: openaiConversationId }).select("*").single();
     if (error) throw error;
     return toConversation(data as Record<string, unknown>);
+  }
+
+  async findConversationByOpenAIId(userId: string, openaiConversationId: string): Promise<ConversationRecord | null> {
+    const { data, error } = await this.db
+      .from("conversations")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("openai_conversation_id", openaiConversationId)
+      .order("started_at", { ascending: false })
+      .limit(1);
+    if (error) throw error;
+    const row = data?.[0];
+    return row ? toConversation(row as Record<string, unknown>) : null;
   }
 
   async appendMessage(conversationId: string, userId: string, message: TranscriptMessage): Promise<void> {
