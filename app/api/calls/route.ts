@@ -40,12 +40,13 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: "Expected JSON or Twilio form data" }, { status: 400 });
   }
-  const isElevenLabsPayload = (body && typeof body === "object" && "type" in body && (body.type === "post_call_transcription" || body.type === "post_call_audio"));
+  const objectBody = body && typeof body === "object" && !Array.isArray(body) ? body as Record<string, unknown> : null;
+  const isElevenLabsPayload = Boolean(objectBody?.type === "post_call_transcription" || objectBody?.type === "post_call_audio");
   if (isElevenLabsPayload && !verifyElevenLabsSignature(rawBody, request.headers.get("elevenlabs-signature") ?? request.headers.get("x-elevenlabs-signature"))) {
     return NextResponse.json({ error: "Invalid ElevenLabs signature" }, { status: 401 });
   }
-  if (body && typeof body === "object" && "action" in body && body.action === "start") {
-    const toNumber = "toNumber" in body && typeof body.toNumber === "string" ? body.toNumber.trim() : "";
+  if (objectBody?.action === "start") {
+    const toNumber = typeof objectBody.toNumber === "string" ? objectBody.toNumber.trim() : "";
     if (!toNumber) return NextResponse.json({ error: "toNumber is required" }, { status: 400 });
     try {
       return NextResponse.json(await startElevenLabsCall(toNumber), { status: 201 });
@@ -53,11 +54,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to start call" }, { status: 503 });
     }
   }
-  if (body && typeof body === "object" && "action" in body && body.action === "retrieve_memory") {
+  const isMemoryRequest = Boolean(objectBody &&
+    (objectBody.action === "retrieve_memory" ||
+      (typeof objectBody.query === "string" && objectBody.type === undefined)));
+  if (isMemoryRequest) {
     const secret = process.env.ELEVENLABS_CALL_TOOL_SECRET;
     const suppliedSecret = request.headers.get("x-aarush-call-secret");
     if (!secret || suppliedSecret !== secret) return NextResponse.json({ error: "Call memory tool is not configured" }, { status: 503 });
-    const query = "query" in body && typeof body.query === "string" ? body.query.trim() : "";
+    const query = typeof objectBody?.query === "string" ? objectBody.query.trim() : "";
     if (!query) return NextResponse.json({ error: "query is required" }, { status: 400 });
     const memories = await retrieveRelevantMemories(new SupabaseMemoryRepository(), getDevUser().id, query, { maxItems: 6, maxCharacters: 1800 });
     return NextResponse.json({ context: formatMemoryContext(memories), memories: memories.map(({ memory, reasons }) => ({ memory, reasons })) });
